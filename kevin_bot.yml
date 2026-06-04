@@ -1,0 +1,54 @@
+# GitHub Actions Workflow — Meet Kevin Summarizer Bot
+# Checks for new videos every hour and summarizes them automatically
+# Runs on GitHub's free servers — zero cost
+
+name: Meet Kevin Summarizer
+
+on:
+  schedule:
+    # Runs every hour at :00
+    # Meet Kevin typically uploads between 9am-2pm US Pacific time
+    # That's 17:00-22:00 UTC — so hourly checks catch it fast
+    - cron: '0 * * * *'
+
+  # Manual trigger for testing
+  workflow_dispatch:
+
+jobs:
+  check-and-summarize:
+    runs-on: ubuntu-latest
+
+    # Required so the bot can commit seen_videos.json back to the repo
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Kevin bot
+        env:
+          GROQ_API_KEY:     ${{ secrets.GROQ_API_KEY }}
+          EMAIL_SENDER:     ${{ secrets.EMAIL_SENDER }}
+          EMAIL_PASSWORD:   ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_RECIPIENT:  ${{ secrets.EMAIL_RECIPIENT }}
+          KEVIN_NTFY:       ${{ secrets.KEVIN_NTFY }}
+        run: python src/kevin_bot.py
+
+      # Commit the updated seen_videos.json back to the repo
+      # This is how the bot remembers which videos it has already processed
+      - name: Save seen videos list
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add seen_videos.json
+          git diff --staged --quiet || git commit -m "Update seen videos [skip ci]"
+          git push
