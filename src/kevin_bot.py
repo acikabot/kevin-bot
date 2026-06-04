@@ -120,16 +120,12 @@ def get_latest_videos(max_videos=5):
 # ─── Transcript fetcher ───────────────────────────────────────────────────────
 
 def get_transcript(video_id: str) -> str:
-    """Fetch full transcript. Tries manual English first, then auto-generated."""
+    """Fetch full transcript using the new youtube-transcript-api v1.x API."""
     try:
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
-        try:
-            transcript = transcript_list.find_manually_created_transcript(["en"])
-        except Exception:
-            transcript = transcript_list.find_generated_transcript(["en"])
-
-        segments  = transcript.fetch()
-        full_text = " ".join(seg["text"] for seg in segments)
+        # New API: YouTubeTranscriptApi().fetch() handles language fallback automatically
+        api = YouTubeTranscriptApi()
+        fetched = api.fetch(video_id, languages=["en"])
+        full_text = " ".join(seg.text for seg in fetched)
         full_text = re.sub(r"\[.*?\]", "", full_text)
         full_text = re.sub(r"\s+", " ", full_text).strip()
         return full_text
