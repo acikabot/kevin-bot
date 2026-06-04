@@ -1,4 +1,4 @@
 feedparser
 openai
 requests
-youtube-transcript-api
+youtube-transcript-api>=1.0.0
