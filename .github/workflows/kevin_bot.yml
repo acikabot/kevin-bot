@@ -1,26 +1,31 @@
 # GitHub Actions Workflow — Meet Kevin Summarizer Bot
-# Checks for new videos every hour and summarizes them automatically
-# Runs on GitHub's free servers — zero cost
+# Checks for new videos every hour
+# Only processes videos published on or after June 4th 2026
 
 name: Meet Kevin Summarizer
 
 on:
   schedule:
-    # Runs every hour at :00
-    # Meet Kevin typically uploads between 9am-2pm US Pacific time
-    # That's 17:00-22:00 UTC — so hourly checks catch it fast
-    - cron: '0 * * * *'
+    - cron: '0 * * * *'   # Every hour
 
-  # Manual trigger for testing
+  # Manual trigger — choose normal run or test mode
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Run mode'
+        required: true
+        default: 'test'
+        type: choice
+        options:
+          - test    # Summarizes latest video, does NOT update seen_videos.json
+          - normal  # Full normal run, updates seen_videos.json
 
 jobs:
   check-and-summarize:
     runs-on: ubuntu-latest
 
-    # Required so the bot can commit seen_videos.json back to the repo
     permissions:
-      contents: write
+      contents: write   # Needed to commit seen_videos.json back to repo
 
     steps:
       - name: Checkout repo
@@ -34,6 +39,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Determine run mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "arg=${{ github.event.inputs.mode == 'test' && 'test' || '' }}" >> $GITHUB_OUTPUT
+          else
+            echo "arg=" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run Kevin bot
         env:
           GROQ_API_KEY:     ${{ secrets.GROQ_API_KEY }}
@@ -41,11 +55,11 @@ jobs:
           EMAIL_PASSWORD:   ${{ secrets.EMAIL_PASSWORD }}
           EMAIL_RECIPIENT:  ${{ secrets.EMAIL_RECIPIENT }}
           KEVIN_NTFY:       ${{ secrets.KEVIN_NTFY }}
-        run: python src/kevin_bot.py
+        run: python src/kevin_bot.py ${{ steps.mode.outputs.arg }}
 
-      # Commit the updated seen_videos.json back to the repo
-      # This is how the bot remembers which videos it has already processed
+      # Only commit seen_videos.json on normal runs (not test mode)
       - name: Save seen videos list
+        if: github.event.inputs.mode != 'test'
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
